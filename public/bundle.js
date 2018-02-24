@@ -2056,6 +2056,9 @@ var Animation = function () {
   return Animation;
 }();
 
+var FONT_SIZE_SCALE = 0.85;
+var TEXT_COLOR = 0xFFFFFF;
+
 var Box = function () {
   function Box() {
     var settings = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
@@ -2076,9 +2079,9 @@ var Box = function () {
 
     var numberStr = number < 10 ? ' ' + number : String(number);
     var numberText = new PIXI.Text(numberStr, {
-      fontSize: size * 0.8,
+      fontSize: size * FONT_SIZE_SCALE,
       fontWeight: '100',
-      fill: '#ffffff'
+      fill: TEXT_COLOR
     });
 
     Object.assign(this, {
@@ -2090,7 +2093,9 @@ var Box = function () {
       isTextVisible: false,
       movingAnimation: null,
       colorAnimation: null,
-      resizeAnimation: null
+      resizeAnimation: null,
+      isPrime: false,
+      isComposite: false
     });
   }
 
@@ -2114,7 +2119,7 @@ var Box = function () {
     key: 'getNextActions',
     value: function getNextActions() {
       var actions = [];
-      var animations = [this.movingAnimation, this.colorAnimation, this.resizeAnimation].filter(Boolean);
+      var animations = [this.movingAnimation, this.colorAnimation, this.resizeAnimation, this.textHideAnimation].filter(Boolean);
       var _iteratorNormalCompletion = true;
       var _didIteratorError = false;
       var _iteratorError = undefined;
@@ -2206,10 +2211,38 @@ var Box = function () {
           var nextSize = calcLinear({ from: size, to: destSize, progress: progress });
           graphic.drawRect(0, 0, nextSize, nextSize);
           graphic.endFill();
-          numberText.style.fontSize = nextSize * 0.9;
+          numberText.style.fontSize = nextSize * FONT_SIZE_SCALE;
           s.size = nextSize;
         }
       });
+    }
+  }, {
+    key: 'setTextHideAnimation',
+    value: function setTextHideAnimation(_ref4) {
+      var frames = _ref4.frames;
+
+      var s = this;
+      var numberText = s.numberText;
+
+      this.textHideAnimation = new Animation({
+        frames: frames,
+        frameAction: function frameAction(progress) {
+          if (progress === 1) {
+            s.hideText();
+          } else {
+            var destColor = s.color;
+            var nextColor = calcLinearColor({ from: TEXT_COLOR, to: destColor, progress: progress });
+            numberText.style = Object.assign({}, numberText.style, {
+              fill: nextColor
+            });
+          }
+        }
+      });
+    }
+  }, {
+    key: 'isDecided',
+    get: function get$$1() {
+      return this.isPrime || this.isComposite;
     }
   }]);
   return Box;
@@ -2276,13 +2309,19 @@ var BoxContainer = function () {
         }
       }
 
+      if (this.waitingAnimation && !this.waitingAnimation.isFinished) {
+        var action = this.waitingAnimation.nextFrame();
+        boxActions.push(action);
+      }
       return boxActions;
     }
   }, {
     key: 'showText',
-    value: function showText() {
-      this.boxes.forEach(function (b) {
-        return b.showText();
+    value: function showText(max) {
+      this.boxes.forEach(function (box) {
+        if (box.number <= max) {
+          box.showText();
+        }
       });
     }
   }, {
@@ -2351,10 +2390,15 @@ var BoxContainer = function () {
         for (var _iterator3 = this.boxes[Symbol.iterator](), _step3; !(_iteratorNormalCompletion3 = (_step3 = _iterator3.next()).done); _iteratorNormalCompletion3 = true) {
           var box = _step3.value;
 
+          if (box.isDecided) {
+            continue;
+          }
           if (box.number === primeNumber) {
             box.setColorAction({ color: Consts.PRIME_NUMBER_COLOR, frames: frames });
+            box.isPrime = true;
           } else if (box.number % primeNumber === 0) {
             box.setColorAction({ color: Consts.COMPOSITE_NUMBER_COLOR, frames: frames });
+            box.isComposite = true;
           }
         }
       } catch (err) {
@@ -2371,6 +2415,85 @@ var BoxContainer = function () {
           }
         }
       }
+    }
+  }, {
+    key: 'setMarkLeftAnimation',
+    value: function setMarkLeftAnimation(_ref3) {
+      var frames = _ref3.frames;
+
+      var primeNumber = this.currentPrimeNumber;
+      var primeNumberSqure = primeNumber ** 2;
+      var _iteratorNormalCompletion4 = true;
+      var _didIteratorError4 = false;
+      var _iteratorError4 = undefined;
+
+      try {
+        for (var _iterator4 = this.boxes[Symbol.iterator](), _step4; !(_iteratorNormalCompletion4 = (_step4 = _iterator4.next()).done); _iteratorNormalCompletion4 = true) {
+          var box = _step4.value;
+
+          if (box.isDecided) {
+            continue;
+          }
+          if (box.number < primeNumberSqure && !box.isDecided) {
+            box.setColorAction({ color: Consts.PRIME_NUMBER_COLOR, frames: frames });
+            box.isPrime = true;
+          }
+        }
+      } catch (err) {
+        _didIteratorError4 = true;
+        _iteratorError4 = err;
+      } finally {
+        try {
+          if (!_iteratorNormalCompletion4 && _iterator4.return) {
+            _iterator4.return();
+          }
+        } finally {
+          if (_didIteratorError4) {
+            throw _iteratorError4;
+          }
+        }
+      }
+    }
+  }, {
+    key: 'setTextHideAnimation',
+    value: function setTextHideAnimation(_ref4) {
+      var frames = _ref4.frames;
+      var _iteratorNormalCompletion5 = true;
+      var _didIteratorError5 = false;
+      var _iteratorError5 = undefined;
+
+      try {
+        for (var _iterator5 = this.boxes[Symbol.iterator](), _step5; !(_iteratorNormalCompletion5 = (_step5 = _iterator5.next()).done); _iteratorNormalCompletion5 = true) {
+          var box = _step5.value;
+
+          if (box.isTextVisible) {
+            box.setTextHideAnimation({ frames: frames });
+          }
+        }
+      } catch (err) {
+        _didIteratorError5 = true;
+        _iteratorError5 = err;
+      } finally {
+        try {
+          if (!_iteratorNormalCompletion5 && _iterator5.return) {
+            _iterator5.return();
+          }
+        } finally {
+          if (_didIteratorError5) {
+            throw _iteratorError5;
+          }
+        }
+      }
+    }
+  }, {
+    key: 'setWaitingAnimation',
+    value: function setWaitingAnimation(_ref5) {
+      var frames = _ref5.frames;
+
+      this.waitingAnimation = new Animation({
+        frames: frames,
+        frameAction: function frameAction(progress) {}
+      });
     }
   }]);
   return BoxContainer;
@@ -2532,18 +2655,27 @@ async function main(pixiView) {
 
   PIXI.ticker.shared.update();
 
+  boxContainer.showText(100);
+
   var frames = 30;
-  var schedule = getPrimes(100).slice(1).map(function (primeNumber) {
+  var schedule = getPrimes(20).slice(1).map(function (primeNumber) {
     return [function () {
       return boxContainer.setMarkAnimation({ frames: frames });
     }, function () {
+      return boxContainer.setWaitingAnimation({ frames: frames });
+    }, function () {
       return boxContainer.setArrangementAnimation({ primeNumber: primeNumber, frames: frames });
+    }, function () {
+      return boxContainer.setWaitingAnimation({ frames: frames });
     }];
   }).reduce(function (a, b) {
     return a.concat(b);
   }, []);
+  schedule.splice(10, 0, function () {
+    return boxContainer.setTextHideAnimation({ frames: frames });
+  });
 
-  var delta = 1000 / 30;
+  var delta = 1000 / 60;
   var _iteratorNormalCompletion = true;
   var _didIteratorError = false;
   var _iteratorError = undefined;
