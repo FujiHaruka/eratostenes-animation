@@ -3,12 +3,13 @@
   "version": "1.0.0",
   "scripts": {
     "build": "rollup -c",
-    "dev": "npm-run-all dev:*",
+    "dev": "npm-run-all --parallel dev:*",
     "dev:watch": "rollup -c -w",
     "dev:server": "live-server public/"
   },
   "license": "MIT",
   "dependencies": {
+    "color": "^3.0.0",
     "npm-run-all": "^4.1.2",
     "pixi.js": "^4.7.0",
     "primes": "^0.0.1",
