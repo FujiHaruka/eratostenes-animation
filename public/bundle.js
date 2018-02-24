@@ -11423,23 +11423,21 @@ _core.utils.mixins.performMixins();/**
 var loader=loaders.shared||null;exports.accessibility=accessibility;exports.extract=extract;exports.extras=extras;exports.filters=filters;exports.interaction=interaction;exports.loaders=loaders;exports.mesh=mesh;exports.particles=particles;exports.prepare=prepare;exports.loader=loader;// Apply the deprecations
 if(typeof _deprecation2.default==='function'){(0, _deprecation2.default)(exports);}// Always export PixiJS globally.
 global.PIXI=exports;// eslint-disable-line
-}).call(this,typeof commonjsGlobal!=="undefined"?commonjsGlobal:typeof self!=="undefined"?self:typeof window!=="undefined"?window:{});},{"./accessibility":42,"./core":65,"./deprecation":131,"./extract":133,"./extras":141,"./filters":153,"./interaction":159,"./loaders":162,"./mesh":171,"./particles":174,"./polyfill":180,"./prepare":184}]},{},[188])(188);});//# sourceMappingURL=pixi.js.map
+}).call(this,typeof commonjsGlobal!=="undefined"?commonjsGlobal:typeof self!=="undefined"?self:typeof window!=="undefined"?window:{});},{"./accessibility":42,"./core":65,"./deprecation":131,"./extract":133,"./extras":141,"./filters":153,"./interaction":159,"./loaders":162,"./mesh":171,"./particles":174,"./polyfill":180,"./prepare":184}]},{},[188])(188);});
 });unwrapExports(pixi);
 
 function changeInTime(func, time) {
-  var delay = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 0;
-
+  var startAt = Date.now();
+  var tickFunc = function tickFunc() {
+    var now = Date.now();
+    var progress = (now - startAt) / time;
+    func(progress);
+  };
+  PIXI.ticker.shared.add(tickFunc);
   setTimeout(function () {
-    var startAt = Date.now();
-    var timer = setInterval(function () {
-      var now = Date.now();
-      var progress = (now - startAt) / time;
-      func(progress);
-    }, 1000 / 60);
-    setTimeout(function () {
-      clearInterval(timer);
-    }, time);
-  }, delay);
+    PIXI.ticker.shared.remove(tickFunc);
+    func(1);
+  }, time);
 }
 
 function calcLinear(_ref) {
@@ -11450,7 +11448,17 @@ function calcLinear(_ref) {
   return from + (to - from) * progress;
 }
 
-var LIMIT_TEXT_SIZE = 16;
+/* global PIXI */
+
+var Consts = {
+  APP_WIDTH: 800,
+  APP_HEIGHT: 600,
+  MAX_BOX_SIZE: 100,
+  ACTIVE_BOX_COLOR: 0x66CCFF,
+  NONACTIVE_BOX_COLOR: 0xCCCCCC
+};
+
+var LIMIT_TEXT_SIZE = 200;
 
 var NumberBox = function () {
   function NumberBox() {
@@ -11458,8 +11466,6 @@ var NumberBox = function () {
     classCallCheck(this, NumberBox);
     var app = config.app,
         number = config.number,
-        _config$color = config.color,
-        color = _config$color === undefined ? 0x66CCFF : _config$color,
         _config$size = config.size,
         size = _config$size === undefined ? 64 : _config$size,
         _config$x = config.x,
@@ -11468,24 +11474,26 @@ var NumberBox = function () {
         y = _config$y === undefined ? 200 : _config$y;
 
     var graphic = new PIXI.Graphics();
+    var color = Consts.ACTIVE_BOX_COLOR;
     graphic.beginFill(color);
     graphic.drawRect(0, 0, size, size);
     graphic.endFill();
     graphic.x = x;
     graphic.y = y;
     this.graphic = graphic;
-    var text = new PIXI.Text(String(number), {
-      align: 'center',
-      fontSize: size - 4,
-      fontWeight: '100'
-    });
+    // const text = new PIXI.Text(String(number), {
+    //   align: 'center',
+    //   fontSize: size * 0.8,
+    //   fontWeight: '100',
+    //   fill: '#ffffff'
+    // })
     if (size > LIMIT_TEXT_SIZE) {
       this.graphic.addChild(text);
       this.enabledText = true;
     } else {
       this.enabledText = false;
     }
-    this.text = text;
+    // this.text = text
     Object.assign(this, {
       app: app,
       number: number,
@@ -11505,32 +11513,23 @@ var NumberBox = function () {
       this.app.stage.removeChild(this.graphic);
     }
   }, {
+    key: 'nonActive',
+    value: function nonActive() {
+      var graphic = this.graphic,
+          size = this.size;
+
+      graphic.beginFill(Consts.NONACTIVE_BOX_COLOR);
+      graphic.drawRect(0, 0, size, size);
+      graphic.endFill();
+      this.color = Consts.NONACTIVE_BOX_COLOR;
+      this.isNonActive = true;
+    }
+  }, {
     key: 'shake',
     value: function shake() {
       var graphic = this.graphic,
           color = this.color,
           size = this.size;
-
-      var time = 100;
-      var largeSize = size * 1.2;
-
-      var _loop = function _loop(i) {
-        var isExpand = i % 2 === 0;
-        var from = isExpand ? size : largeSize;
-        var to = isExpand ? largeSize : size;
-        changeInTime(function (progress) {
-          graphic.clear();
-          graphic.beginFill(color);
-          var nextSize = calcLinear({ from: from, to: to, progress: progress });
-          var pos = (size - nextSize) / 2;
-          graphic.drawRect(pos, pos, nextSize, nextSize);
-          graphic.endFill();
-        }, time, time * i);
-      };
-
-      for (var i = 0; i < 4; i++) {
-        _loop(i);
-      }
     }
   }, {
     key: 'moveTo',
@@ -11584,31 +11583,269 @@ var NumberBox = function () {
   return NumberBox;
 }();
 
-function main() {
-  var width = 800;
-  var height = 400;
+var APP_WIDTH = Consts.APP_WIDTH,
+    MAX_BOX_SIZE = Consts.MAX_BOX_SIZE;
 
+var NumberBoxContainer = function () {
+  function NumberBoxContainer(_ref) {
+    var _this = this;
+
+    var app = _ref.app,
+        _ref$maxNumber = _ref.maxNumber,
+        maxNumber = _ref$maxNumber === undefined ? 100 : _ref$maxNumber,
+        _ref$targetNumber = _ref.targetNumber,
+        targetNumber = _ref$targetNumber === undefined ? 2 : _ref$targetNumber;
+    classCallCheck(this, NumberBoxContainer);
+
+    this.targetNumber = targetNumber;
+    this.size = this.calcBoxSize();
+    this.numberBoxes = new Array(maxNumber).fill(null).map(function (_, i) {
+      var number = i + 1;
+
+      var _calcBoxPosition = _this.calcBoxPosition(number),
+          x = _calcBoxPosition.x,
+          y = _calcBoxPosition.y;
+
+      return new NumberBox({ app: app, size: _this.size, number: number, x: x, y: y });
+    });
+  }
+
+  createClass(NumberBoxContainer, [{
+    key: 'changeTargetNumber',
+    value: function changeTargetNumber(_ref2) {
+      var targetNumber = _ref2.number,
+          _ref2$time = _ref2.time,
+          time = _ref2$time === undefined ? 1000 : _ref2$time;
+
+      this.targetNumber = targetNumber;
+      var size = this.calcBoxSize();
+      var shouldUpdateSize = this.size !== size;
+      this.size = size;
+      var _iteratorNormalCompletion = true;
+      var _didIteratorError = false;
+      var _iteratorError = undefined;
+
+      try {
+        for (var _iterator = this.numberBoxes[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
+          var box = _step.value;
+
+          var _calcBoxPosition2 = this.calcBoxPosition(box.number),
+              x = _calcBoxPosition2.x,
+              y = _calcBoxPosition2.y;
+
+          box.moveTo({ x: x, y: y, time: time });
+          if (shouldUpdateSize) {
+            box.resizeTo({ size: size, time: time });
+          }
+        }
+      } catch (err) {
+        _didIteratorError = true;
+        _iteratorError = err;
+      } finally {
+        try {
+          if (!_iteratorNormalCompletion && _iterator.return) {
+            _iterator.return();
+          }
+        } finally {
+          if (_didIteratorError) {
+            throw _iteratorError;
+          }
+        }
+      }
+    }
+  }, {
+    key: 'markAsSynthesis',
+    value: function markAsSynthesis(number) {
+      var boxes = this.numberBoxes.filter(function (box) {
+        return box.number % number === 0 && box.number !== number;
+      });
+      var _iteratorNormalCompletion2 = true;
+      var _didIteratorError2 = false;
+      var _iteratorError2 = undefined;
+
+      try {
+        for (var _iterator2 = boxes[Symbol.iterator](), _step2; !(_iteratorNormalCompletion2 = (_step2 = _iterator2.next()).done); _iteratorNormalCompletion2 = true) {
+          var box = _step2.value;
+
+          if (!box.isNonActive) {
+            box.nonActive();
+          }
+        }
+      } catch (err) {
+        _didIteratorError2 = true;
+        _iteratorError2 = err;
+      } finally {
+        try {
+          if (!_iteratorNormalCompletion2 && _iterator2.return) {
+            _iterator2.return();
+          }
+        } finally {
+          if (_didIteratorError2) {
+            throw _iteratorError2;
+          }
+        }
+      }
+    }
+  }, {
+    key: 'calcBoxPosition',
+    value: function calcBoxPosition(number) {
+      var size = this.size,
+          raws = this.targetNumber;
+
+      var x = size * ((number - 1) % raws);
+      var y = size * Math.floor((number - 1) / raws);
+      return { x: x, y: y };
+    }
+  }, {
+    key: 'calcBoxSize',
+    value: function calcBoxSize() {
+      return Math.min(APP_WIDTH / this.targetNumber, MAX_BOX_SIZE);
+    }
+  }, {
+    key: 'enable',
+    value: function enable() {
+      var _iteratorNormalCompletion3 = true;
+      var _didIteratorError3 = false;
+      var _iteratorError3 = undefined;
+
+      try {
+        for (var _iterator3 = this.numberBoxes[Symbol.iterator](), _step3; !(_iteratorNormalCompletion3 = (_step3 = _iterator3.next()).done); _iteratorNormalCompletion3 = true) {
+          var box = _step3.value;
+
+          box.enable();
+        }
+      } catch (err) {
+        _didIteratorError3 = true;
+        _iteratorError3 = err;
+      } finally {
+        try {
+          if (!_iteratorNormalCompletion3 && _iterator3.return) {
+            _iterator3.return();
+          }
+        } finally {
+          if (_didIteratorError3) {
+            throw _iteratorError3;
+          }
+        }
+      }
+    }
+  }, {
+    key: 'disable',
+    value: function disable() {
+      var _iteratorNormalCompletion4 = true;
+      var _didIteratorError4 = false;
+      var _iteratorError4 = undefined;
+
+      try {
+        for (var _iterator4 = this.numberBoxes[Symbol.iterator](), _step4; !(_iteratorNormalCompletion4 = (_step4 = _iterator4.next()).done); _iteratorNormalCompletion4 = true) {
+          var box = _step4.value;
+
+          box.disable();
+        }
+      } catch (err) {
+        _didIteratorError4 = true;
+        _iteratorError4 = err;
+      } finally {
+        try {
+          if (!_iteratorNormalCompletion4 && _iterator4.return) {
+            _iterator4.return();
+          }
+        } finally {
+          if (_didIteratorError4) {
+            throw _iteratorError4;
+          }
+        }
+      }
+    }
+  }]);
+  return NumberBoxContainer;
+}();
+
+/**
+ *	Find is num is prime
+ *	@param {Number} num
+ */
+
+var isprime = function isprime(num) {
+  if (num == 1) return false;
+  num += 2;
+  var sieve = new Array(num).join(',').split(',') // get values for map to work
+  .map(function () {
+    return true;
+  });
+
+  for (var i = 2; i <= num; i++) {
+    if (sieve[i]) {
+      for (var j = i * i; j < num; j += i) {
+        sieve[j] = false;
+      }    }  }
+  return sieve[num - 2];
+};
+
+/**
+ *  Generate prime numbers according to the lower and upper bound
+ *  @param {Number} min
+ *  @param [{Number}] max
+ */
+
+var primes = function primes(min, max) {
+  var holdme;
+
+  if (!arguments.length) return [];
+  if (min < 0 || max < 0) return [];
+
+  if (min === max) return isprime(min) ? [min] : [];
+
+  if (~min && ~max && min > max) {
+    holdme = min;
+    min = max;
+    max = holdme;
+  }
+  if (max === undefined) {
+    max = min;
+    min = 0;
+  }
+  if (min == 0) min = 1;
+
+  return new Array(max + 1).join(',').split(',').map(function (a, b) {
+    return b;
+  }).slice(min, max).filter(isprime);
+};
+
+function main() {
   var app = new PIXI.Application({
-    width: width,
-    height: height,
-    backgroundColor: 0xffffff
+    width: Consts.APP_WIDTH,
+    height: Consts.APP_HEIGHT,
+    backgroundColor: 0xffffff,
+    sharedTicker: true
   });
   document.getElementById('pixi-view').appendChild(app.view);
 
-  var box = new NumberBox({ app: app, number: 1 });
-  box.enable();
-
-  box.shake();
-  setTimeout(function () {
-    box.resizeTo({ size: 5, time: 1000 });
-  }, 1000);
-  setTimeout(function () {
-    box.resizeTo({ size: 64, time: 1000 });
-  }, 2000);
-
-  app.ticker.add(function (delta) {
-    // box.x += 10
+  var container = new NumberBoxContainer({
+    app: app,
+    maxNumber: 2000,
+    targetNumber: 2
   });
+  container.enable();
+  // setTimeout(() => {
+  //   container.changeTargetNumber({number: 2, time: 1000})
+  // }, 1000)
+
+  var primeList = primes(100);
+
+  var _loop = function _loop(i) {
+    var prime = primeList[i];
+    // setTimeout(() => {
+    //   container.markAsSynthesis(prime)
+    // }, 3000 * (i + 1) + 1000)
+    setTimeout(function () {
+      container.changeTargetNumber({ number: prime, time: 2000 });
+    }, 3000 * (i + 1));
+  };
+
+  for (var i = 0; i < primeList.length; i++) {
+    _loop(i);
+  }
 }
 
 window.addEventListener('DOMContentLoaded', main);

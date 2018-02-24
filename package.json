@@ -1,15 +1,17 @@
 {
-  "name": "visualize-eratostenes",
+  "name": "eratostenes-animation",
   "version": "1.0.0",
-  "main": "index.js",
   "scripts": {
     "build": "rollup -c",
-    "dev": "live-server public/",
-    "watch": "rollup -c -w"
+    "dev": "npm-run-all dev:*",
+    "dev:watch": "rollup -c -w",
+    "dev:server": "live-server public/"
   },
   "license": "MIT",
   "dependencies": {
+    "npm-run-all": "^4.1.2",
     "pixi.js": "^4.7.0",
+    "primes": "^0.0.1",
     "rollup": "^0.56.1"
   },
   "devDependencies": {
