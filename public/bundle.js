@@ -2015,6 +2015,17 @@ function calcBoxSize(cols) {
   return Math.min(APP_WIDTH / cols, MAX_BOX_SIZE);
 }
 
+function downloadCanvas(canvas, name) {
+  var link = document.getElementById('download-link');
+  link.href = canvas.toDataURL();
+  link.download = name;
+  link.click();
+}
+
+function paddingZero(number) {
+  return ('000000' + number).slice(-6);
+}
+
 /* global PIXI */
 
 // 関数 frameAction を frames フレームで実行するアニメーション
@@ -2431,7 +2442,7 @@ var BoxContainer = function () {
         for (var _iterator4 = this.boxes[Symbol.iterator](), _step4; !(_iteratorNormalCompletion4 = (_step4 = _iterator4.next()).done); _iteratorNormalCompletion4 = true) {
           var box = _step4.value;
 
-          if (box.isDecided) {
+          if (box.isDecided || box.number === 1) {
             continue;
           }
           if (box.number < primeNumberSqure && !box.isDecided) {
@@ -2637,6 +2648,11 @@ var asleep = function asleep(sleepMs) {
   });
 };
 
+var downloadEnabled = false;
+var downloadName = function downloadName(frame) {
+  return 'eratostenes-' + paddingZero(frame);
+};
+
 async function main(pixiView) {
   var app = new Application({
     width: Consts.APP_WIDTH,
@@ -2650,32 +2666,44 @@ async function main(pixiView) {
   PIXI.ticker.shared.stop();
   PIXI.ticker.shared.update();
 
-  var boxContainer = new BoxContainer(100);
+  var boxCount = 100;
+  var boxContainer = new BoxContainer(boxCount);
   app.addBoxContainer(boxContainer);
 
   PIXI.ticker.shared.update();
-
   boxContainer.showText(100);
 
+  var currentFrame = 0;
+  if (downloadEnabled) {
+    downloadCanvas(app.view, downloadName(currentFrame));
+  }
+
   var frames = 30;
-  var schedule = getPrimes(20).slice(1).map(function (primeNumber) {
+  var primes = Math.floor(Math.sqrt(boxCount));
+  var schedule = getPrimes(primes).slice(1).map(function (primeNumber) {
     return [function () {
       return boxContainer.setMarkAnimation({ frames: frames });
     }, function () {
-      return boxContainer.setWaitingAnimation({ frames: frames });
+      return boxContainer.setWaitingAnimation({ frames: frames * 2 });
     }, function () {
-      return boxContainer.setArrangementAnimation({ primeNumber: primeNumber, frames: frames });
+      return boxContainer.setArrangementAnimation({ primeNumber: primeNumber, frames: frames * 2 });
     }, function () {
       return boxContainer.setWaitingAnimation({ frames: frames });
     }];
   }).reduce(function (a, b) {
     return a.concat(b);
   }, []);
-  schedule.splice(10, 0, function () {
-    return boxContainer.setTextHideAnimation({ frames: frames });
+  schedule.splice(14, 0, function () {
+    return boxContainer.setTextHideAnimation({ frames: 15 });
+  });
+  schedule.push(function () {
+    return boxContainer.setMarkAnimation({ frames: frames });
+  });
+  schedule.push(function () {
+    return boxContainer.setMarkLeftAnimation({ frames: frames });
   });
 
-  var delta = 1000 / 60;
+  var delta = 1000 / 30;
   var _iteratorNormalCompletion = true;
   var _didIteratorError = false;
   var _iteratorError = undefined;
@@ -2693,9 +2721,12 @@ async function main(pixiView) {
         Task.add(actions);
         Task.doAll();
         PIXI.ticker.shared.update();
+        currentFrame += 1;
+        if (downloadEnabled) {
+          downloadCanvas(app.view, downloadName(currentFrame));
+        }
         await asleep(delta);
       }
-      asleep(1000);
     }
   } catch (err) {
     _didIteratorError = true;
