@@ -5,9 +5,10 @@ var Consts = {
   APP_WIDTH: 1080,
   APP_HEIGHT: 1080,
   MAX_BOX_SIZE: 160,
-  PRIME_NUMBER_COLOR: 0x66CCFF,
-  DEFAULT_NUMBER_COLOR: 0xCCCCCC,
-  COMPOSITE_NUMBER_COLOR: 0xFFCC55
+  ONE_NUMBER_COLOR: 0xCCCCCC,
+  PRIME_NUMBER_COLOR: 0x5398D9,
+  DEFAULT_NUMBER_COLOR: 0x14325C,
+  COMPOSITE_NUMBER_COLOR: 0xF4E3B1
 };
 
 function createCommonjsModule(fn, module) {
@@ -2279,12 +2280,14 @@ var BoxContainer = function () {
       }),
           x = _calcBoxPosition.x,
           y = _calcBoxPosition.y;
+      // 1 だけ色を変える
+
 
       return new Box({
         number: number,
         x: x,
         y: y,
-        color: Consts.DEFAULT_NUMBER_COLOR,
+        color: number === 1 ? Consts.ONE_NUMBER_COLOR : Consts.DEFAULT_NUMBER_COLOR,
         size: size
       });
     });
@@ -2678,7 +2681,7 @@ async function main(pixiView) {
     downloadCanvas(app.view, downloadName(currentFrame));
   }
 
-  var frames = 30;
+  var frames = 10;
   var primes = Math.floor(Math.sqrt(boxCount));
   var schedule = getPrimes(primes).slice(1).map(function (primeNumber) {
     return [function () {
@@ -2694,13 +2697,22 @@ async function main(pixiView) {
     return a.concat(b);
   }, []);
   schedule.splice(14, 0, function () {
-    return boxContainer.setTextHideAnimation({ frames: 15 });
+    return boxContainer.setTextHideAnimation({ frames: frames });
+  });
+  schedule.splice(13, 1, function () {
+    return boxContainer.setWaitingAnimation({ frames: frames });
+  });
+  schedule.unshift(function () {
+    return boxContainer.setWaitingAnimation({ frames: frames * 2 });
   });
   schedule.push(function () {
     return boxContainer.setMarkAnimation({ frames: frames });
   });
   schedule.push(function () {
     return boxContainer.setMarkLeftAnimation({ frames: frames });
+  });
+  schedule.push(function () {
+    return boxContainer.setWaitingAnimation({ frames: frames * 2 });
   });
 
   var delta = 1000 / 30;
